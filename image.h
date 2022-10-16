@@ -1,19 +1,20 @@
 #include <stdio.h>
-#define IMAGE_SIZE 512
 
+#define IMAGE_SIZE 512
+#define NUM_POINTS 100
+
+// Image structure
 typedef struct {
   float (*data)[IMAGE_SIZE];
+  int (*xcoords), (*ycoords);
 } Image;
 
 Image new_image();
 
 Image clone_image(const Image *original);
 
-void write_image(FILE *f, const Image *img);
+void write_image(FILE *f, FILE *xcoord, FILE *ycoord, const Image *img);
 
-Image load_image(FILE *f);
+Image load_image(FILE *f, FILE *xcoord, FILE *ycoord);
 
-/// @brief A simple transform mapping existing pixels to new destinations.
-/// Appears to arrange data into roughly grid shaped patterns.
-/// @param img A pointer to a heap allocated Image.
-void matrix_transform_image(Image *img);
+void write_graph_file();
