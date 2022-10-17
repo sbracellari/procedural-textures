@@ -1,11 +1,23 @@
 #include "image.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 Image new_image() {
   Image img;
   img.data = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
 
+  return img;
+}
+
+Image rand_image() {
+  Image img = new_image();
+  srand(time(NULL));
+  for (int i = 0; i < IMAGE_SIZE; ++i) {
+    for (int j = 0; j < IMAGE_SIZE; ++j) {
+      img.data[i][j] = (float)rand() / (float)(RAND_MAX);
+    }
+  }
   return img;
 }
 
@@ -45,4 +57,10 @@ Image load_image(FILE *f) {
     counter++;
   }
   return img;
+}
+
+void swap_image(Image *img1, Image *img2) {
+  Image tmp = *img1;
+  *img1 = *img2;
+  *img2 = tmp;
 }

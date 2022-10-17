@@ -1,3 +1,4 @@
+#include "transform.h"
 #include "image.h"
 #include <math.h>
 #include <stdio.h>
@@ -6,6 +7,41 @@
 
 const int LUCAS1 = 11;
 const int LUCAS2 = 47;
+
+typedef struct {
+  int x, y;
+  float value;
+} Score;
+
+int score_comp(const void *elem1, const void *elem2) {
+  Score f = *((Score *)elem1);
+  Score s = *((Score *)elem2);
+  if (f.value > s.value)
+    return 1;
+  if (f.value < s.value)
+    return -1;
+  return 0;
+}
+
+Points top_points(Image *img) {
+  Points ps = init_points();
+  Score best_col[IMAGE_SIZE];
+  for (int i = 0; i < IMAGE_SIZE; ++i) {
+    Score best = {.x = i, .y = 0, .value = img->data[i][0]};
+    for (int j = 0; j < IMAGE_SIZE; ++j) {
+      if (best.value < img->data[i][j]) {
+        best = (Score){.x = i, .y = j, .value = img->data[i][j]};
+      }
+    }
+    best_col[i] = best;
+  }
+  qsort(&best_col, IMAGE_SIZE, sizeof(Score), score_comp);
+  for (int i = 0; i < NUM_POINTS; ++i) {
+    ps.xcoords[i] = best_col[i].x;
+    ps.ycoords[i] = best_col[i].y;
+  }
+  return ps;
+}
 
 typedef void (*Transform)(Image *);
 
@@ -35,14 +71,15 @@ void matrix_transform_image(Image *img) {
   free(backup.data);
 }
 
-typedef struct {
-  int(*xcoords), (*ycoords);
-} Points;
+Points init_points() {
+  Points ps = {.xcoords = malloc(sizeof(float[NUM_POINTS])),
+               .ycoords = malloc(sizeof(float[NUM_POINTS]))};
+  return ps;
+}
 
 // generate some random data as a starting points
 Points generate_points() {
-  Points ps = {.xcoords = malloc(sizeof(float[NUM_POINTS])),
-               .ycoords = malloc(sizeof(float[NUM_POINTS]))};
+  Points ps = init_points();
   srand(time(NULL));
   for (int i = 0; i < NUM_POINTS; i++) {
     ps.xcoords[i] = rand() % IMAGE_SIZE;
@@ -51,12 +88,19 @@ Points generate_points() {
   return ps;
 }
 
+Points generate_points2() {
+  Image img = rand_image();
+  Points top = top_points(&img);
+  free(img.data);
+  return top;
+}
+
 // for any given point (x,y), look at a number of surrounding
 // points (NUM_POINTS) and calculate the distance to the closest one
 // this is pretty inefficient as it stands but that might lend itself
 // well to the parallelization that'll take place later on
 void distance(Image *img) {
-  Points ps = generate_points();
+  Points ps = generate_points2();
   float mindist = INFINITY;
   for (int x = 0; x < IMAGE_SIZE; x++) {
     for (int y = 0; y < IMAGE_SIZE; y++) {
