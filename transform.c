@@ -7,9 +7,6 @@
 const int LUCAS1 = 11;
 const int LUCAS2 = 47;
 
-float mindist = INFINITY;
-float maxdist = 0;
-
 typedef struct {
   int x, y;
 } Index2D;
@@ -36,13 +33,20 @@ void matrix_transform_image(Image *img) {
   free(backup.data);
 }
 
-// generate some random data as a starting point
-void generate_data(Image *img) {
+typedef struct {
+  int(*xcoords), (*ycoords);
+} Points;
+
+// generate some random data as a starting points
+Points generate_points() {
+  Points ps = {.xcoords = malloc(sizeof(float[NUM_POINTS])),
+               .ycoords = malloc(sizeof(float[NUM_POINTS]))};
   srand(time(NULL));
   for (int i = 0; i < NUM_POINTS; i++) {
-    img->xcoords[i] = rand() % IMAGE_SIZE;
-    img->ycoords[i] = rand() % IMAGE_SIZE;
+    ps.xcoords[i] = rand() % IMAGE_SIZE;
+    ps.ycoords[i] = rand() % IMAGE_SIZE;
   }
+  return ps;
 }
 
 // for any given point (x,y), look at a number of surrounding
@@ -50,11 +54,14 @@ void generate_data(Image *img) {
 // this is pretty inefficient as it stands but that might lend itself
 // well to the parallelization that'll take place later on
 void distance(Image *img) {
+  Points ps = generate_points();
+  float mindist = INFINITY;
   for (int x = 0; x < IMAGE_SIZE; x++) {
     for (int y = 0; y < IMAGE_SIZE; y++) {
       mindist = INFINITY;
       for (int i = 0; i < NUM_POINTS; i++) {
-        float distance = sqrt(pow(img->xcoords[i] - x, 2) + pow(img->ycoords[i] - y, 2));
+        float distance =
+            sqrt(pow(ps.xcoords[i] - x, 2) + pow(ps.ycoords[i] - y, 2));
         if (distance < mindist) {
           mindist = distance;
         }
@@ -63,49 +70,51 @@ void distance(Image *img) {
       img->data[x][y] = mindist;
     }
   }
+  free(ps.xcoords);
+  free(ps.ycoords);
 }
 
-//The folding technique is used here
-//Fold each value 3 times
-//There are two triple nested for loops that will
-//be parallelized later on for improved performance
+// The folding technique is used here
+// Fold each value 3 times
+// There are two triple nested for loops that will
+// be parallelized later on for improved performance
 void folding(Image *img) {
   float scale_A[IMAGE_SIZE][IMAGE_SIZE];
-  float fold_A[IMAGE_SIZE][IMAGE_SIZE]; 
+  float fold_A[IMAGE_SIZE][IMAGE_SIZE];
 
-  float temp_A[IMAGE_SIZE][IMAGE_SIZE]; 
+  float temp_A[IMAGE_SIZE][IMAGE_SIZE];
 
   // temp value for data so it doesnt overwrite, maybe add clone?
   for (int x = 0; x < IMAGE_SIZE; x++) {
-        for (int y = 0; y < IMAGE_SIZE; y++) {
-            temp_A[x][y] = img->data[x][y];
-        } 
+    for (int y = 0; y < IMAGE_SIZE; y++) {
+      temp_A[x][y] = img->data[x][y];
     }
+  }
 
-  for (int nfolds = 0; nfolds < 3; nfolds++)  {
+  for (int nfolds = 0; nfolds < 3; nfolds++) {
     float min_A = temp_A[0][0];
     float max_A = temp_A[0][0];
     for (int x = 0; x < IMAGE_SIZE; x++) {
-        for (int y = 0; y < IMAGE_SIZE; y++) {
-            if (min_A > temp_A[x][y]) {
-                min_A = temp_A[x][y];
-            } else if (max_A < temp_A[x][y]) {
-                max_A = temp_A[x][y];
-            }
-        } 
-    }  
+      for (int y = 0; y < IMAGE_SIZE; y++) {
+        if (min_A > temp_A[x][y]) {
+          min_A = temp_A[x][y];
+        } else if (max_A < temp_A[x][y]) {
+          max_A = temp_A[x][y];
+        }
+      }
+    }
     max_A = max_A - min_A;
 
     for (int x = 0; x < IMAGE_SIZE; x++) {
-        for (int y = 0; y < IMAGE_SIZE; y++) {
-            if (nfolds == 0) {
-                img->data[x][y] = temp_A[x][y];
-            }
-            scale_A[x][y] = img->data[x][y] - min_A;
-            fold_A[x][y] = max_A / (nfolds + 1);
-            img->data[x][y] = fabs(scale_A[x][y] - fold_A[x][y]);
-        } 
-    } 
+      for (int y = 0; y < IMAGE_SIZE; y++) {
+        if (nfolds == 0) {
+          img->data[x][y] = temp_A[x][y];
+        }
+        scale_A[x][y] = img->data[x][y] - min_A;
+        fold_A[x][y] = max_A / (nfolds + 1);
+        img->data[x][y] = fabs(scale_A[x][y] - fold_A[x][y]);
+      }
+    }
   }
 }
 
@@ -113,6 +122,8 @@ void folding(Image *img) {
 // to a meaningful color value. as points get closer together,
 // they get darker
 void color_convert(Image *img) {
+  float mindist = INFINITY;
+  float maxdist = 0;
   for (int x = 0; x < IMAGE_SIZE; x++) {
     for (int y = 0; y < IMAGE_SIZE; y++) {
       if (img->data[x][y] < mindist) {
@@ -129,7 +140,6 @@ void color_convert(Image *img) {
 void write_graph_file() {
   Image img = new_image();
 
-  generate_data(&img);
   distance(&img);
   folding(&img);
   color_convert(&img);
@@ -137,5 +147,5 @@ void write_graph_file() {
 
   // matrix_transform_image(&img);
   // printf("Transformed Image\n");
-  write_image(fopen("cells.txt", "w"), fopen("cellsx.txt", "w"), fopen("cellsy.txt", "w"), &img);
+  write_image(fopen("cells.txt", "w"), &img);
 }
