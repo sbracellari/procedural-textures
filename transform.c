@@ -7,6 +7,8 @@
 const int LUCAS1 = 11;
 const int LUCAS2 = 47;
 
+typedef void (*Transform)(Image *);
+
 typedef struct {
   int x, y;
 } Index2D;
@@ -137,15 +139,27 @@ void color_convert(Image *img) {
   }
 }
 
-void write_graph_file() {
+void write_graph(Transform t, const char *fname) {
   Image img = new_image();
 
   distance(&img);
-  folding(&img);
+
+  t(&img);
   color_convert(&img);
   printf("Generated Image\n");
 
   // matrix_transform_image(&img);
   // printf("Transformed Image\n");
-  write_image(fopen("cells.txt", "w"), &img);
+  write_image(fopen(fname, "w"), &img);
+}
+
+void write_graph_file() {
+  Transform t[2];
+  t[0] = &folding;
+  t[1] = &matrix_transform_image;
+  for (int img_id = 0; img_id < 2; img_id++) {
+    char fname[20];
+    sprintf(fname, "img/%d", img_id);
+    write_graph(t[img_id], fname);
+  }
 }

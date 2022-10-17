@@ -1,2 +1,4 @@
 *.out
 *.txt
+img/*
+!img/dummy.txt
