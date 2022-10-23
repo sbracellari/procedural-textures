@@ -1,26 +1,29 @@
 #include "image.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 Image new_image() {
   Image img;
   img.data = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
-  img.xcoords = malloc(sizeof(float[NUM_POINTS]));
-  img.ycoords = malloc(sizeof(float[NUM_POINTS]));
 
+  return img;
+}
+
+Image rand_image() {
+  Image img = new_image();
+  srand(time(NULL));
+  for (int i = 0; i < IMAGE_SIZE; ++i) {
+    for (int j = 0; j < IMAGE_SIZE; ++j) {
+      img.data[i][j] = (float)rand() / (float)(RAND_MAX);
+    }
+  }
   return img;
 }
 
 Image clone_image(const Image *original) {
   Image out;
   out.data = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
-  out.xcoords = malloc(sizeof(float[NUM_POINTS]));
-  out.ycoords = malloc(sizeof(float[NUM_POINTS]));
-
-  for (int x = 0; x < NUM_POINTS; x++) {
-    out.xcoords[x] = original->xcoords[x];
-    out.ycoords[x] = original->ycoords[x];
-  }
 
   for (int x = 0; x < IMAGE_SIZE; x++) {
     for (int y = 0; y < IMAGE_SIZE; y++) {
@@ -31,12 +34,7 @@ Image clone_image(const Image *original) {
   return out;
 }
 
-void write_image(FILE *f, FILE *xcoord, FILE *ycoord, const Image *img) {
-  for (int x = 0; x < NUM_POINTS; x++) {
-    fprintf(xcoord, "%i\n", img->xcoords[x]);
-    fprintf(ycoord, "%i\n", img->ycoords[x]);
-  }
-
+void write_image(FILE *f, const Image *img) {
   for (int x = 0; x < IMAGE_SIZE; x++) {
     for (int y = 0; y < IMAGE_SIZE; y++) {
       fprintf(f, "%f\n", img->data[x][y]);
@@ -44,8 +42,8 @@ void write_image(FILE *f, FILE *xcoord, FILE *ycoord, const Image *img) {
   }
 }
 
-Image load_image(FILE *f, FILE *xcoord, FILE *ycoord) {
-  if (f == NULL || xcoord == NULL || ycoord == NULL) {
+Image load_image(FILE *f) {
+  if (f == NULL) {
     exit(1);
   }
   char *line = NULL;
@@ -58,26 +56,11 @@ Image load_image(FILE *f, FILE *xcoord, FILE *ycoord) {
     img.data[counter / IMAGE_SIZE][counter % IMAGE_SIZE] = pt;
     counter++;
   }
-
-  char *linex = NULL;
-  size_t lenx = 0;
-  ssize_t readx;
-  int counterx = 0;
-  while ((readx = getline(&linex, &lenx, xcoord)) != -1) {
-    int ptx = strtof(linex, NULL);
-    img.xcoords[counterx];
-    counterx++;
-  }
-
-  char *liney = NULL;
-  size_t leny = 0;
-  ssize_t ready;
-  int countery = 0;
-  while ((ready = getline(&liney, &leny, ycoord)) != -1) {
-    int pty = strtof(liney, NULL);
-    img.ycoords[countery];
-    countery++;
-  }
-
   return img;
+}
+
+void swap_image(Image *img1, Image *img2) {
+  Image tmp = *img1;
+  *img1 = *img2;
+  *img2 = tmp;
 }
