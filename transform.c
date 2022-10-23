@@ -106,8 +106,9 @@ void distance(Image *img) {
     for (int y = 0; y < IMAGE_SIZE; y++) {
       mindist = INFINITY;
       for (int i = 0; i < NUM_POINTS; i++) {
-        float distance =
-            sqrt(pow(ps.xcoords[i] - x, 2) + pow(ps.ycoords[i] - y, 2));
+        float x_dist = (ps.xcoords[i] - x) * (ps.xcoords[i] - x);
+        float y_dist = (ps.ycoords[i] - y) * (ps.ycoords[i] - y);
+        float distance = sqrt(x_dist + y_dist);
         if (distance < mindist) {
           mindist = distance;
         }
