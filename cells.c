@@ -4,8 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define true 1
+#define false 0
+
 int main() {
-  write_graph_file();
+  int do_io = true;
+  generate_files(do_io);
 
   return 0;
 }

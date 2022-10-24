@@ -1,4 +1,4 @@
-void write_graph_file();
+void generate_files(int do_io);
 typedef struct {
   int(*xcoords), (*ycoords);
 } Points;

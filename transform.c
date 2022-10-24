@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <time.h>
 
-const int LUCAS1 = 11;
-const int LUCAS2 = 47;
+// const int LUCAS1 = 11;
+const int LUCAS1 = 29;
+// const int LUCAS2 = 47;
+const int LUCAS2 = 199;
 
 typedef struct {
   int x, y;
@@ -43,6 +45,23 @@ Points top_points(Image *img) {
   return ps;
 }
 
+Points all_top_points(Image *img) {
+  Points ps = init_points();
+  Score scores[IMAGE_SIZE * IMAGE_SIZE];
+  for (int i = 0; i < IMAGE_SIZE * IMAGE_SIZE; ++i) {
+    int x = i % IMAGE_SIZE;
+    int y = i / IMAGE_SIZE;
+    Score score = {.x = x, .y = y, .value = img->data[y][x]};
+    scores[i] = score;
+  }
+  qsort(&scores, IMAGE_SIZE * IMAGE_SIZE, sizeof(Score), score_comp);
+  for (int i = 0; i < NUM_POINTS; ++i) {
+    ps.xcoords[i] = scores[i].x;
+    ps.ycoords[i] = scores[i].y;
+  }
+  return ps;
+}
+
 typedef void (*Transform)(Image *);
 
 typedef struct {
@@ -65,7 +84,7 @@ void matrix_transform_image(Image *img) {
   for (int x = 0; x < IMAGE_SIZE; ++x) {
     for (int y = 0; y < IMAGE_SIZE; ++y) {
       Index2D dest = matrix_transform_sq(x, y, IMAGE_SIZE);
-      img->data[dest.x][dest.y] = backup.data[x][y];
+      img->data[dest.x][dest.y] += backup.data[x][y];
     }
   }
   free(backup.data);
@@ -95,12 +114,18 @@ Points generate_points2() {
   return top;
 }
 
+Points generate_points3(Image *img) {
+  Points top = all_top_points(img);
+  return top;
+}
+
 // for any given point (x,y), look at a number of surrounding
 // points (NUM_POINTS) and calculate the distance to the closest one
 // this is pretty inefficient as it stands but that might lend itself
 // well to the parallelization that'll take place later on
 void distance(Image *img) {
-  Points ps = generate_points2();
+  // Todo less stupid way of using an image to fetch random points
+  Points ps = generate_points3(img);
   float mindist = INFINITY;
   for (int x = 0; x < IMAGE_SIZE; x++) {
     for (int y = 0; y < IMAGE_SIZE; y++) {
@@ -184,27 +209,40 @@ void color_convert(Image *img) {
   }
 }
 
-void write_graph(Transform t, const char *fname) {
-  Image img = new_image();
+void identity(Image *img) {}
 
+Image generate_image(Transform *pre, int pre_count, Transform *post,
+                     int post_count) {
+  // Todo different random?
+  Image img = rand_image();
+  for (int i = 0; i < pre_count; ++i) {
+    (*pre)(&img);
+    pre++;
+  }
   distance(&img);
+  for (int i = 0; i < post_count; ++i) {
+    (*post)(&img);
+    post++;
+  }
 
-  t(&img);
   color_convert(&img);
   printf("Generated Image\n");
-
-  // matrix_transform_image(&img);
-  // printf("Transformed Image\n");
-  write_image(fopen(fname, "w"), &img);
+  return img;
 }
 
-void write_graph_file() {
-  Transform t[2];
-  t[0] = &folding;
-  t[1] = &matrix_transform_image;
+void generate_files(int do_io) {
+  Transform pre[2];
+  pre[0] = &identity;
+  pre[1] = &identity;
+  Transform post[3];
+  post[0] = &folding;
+  post[1] = &matrix_transform_image;
+  post[2] = &folding;
   for (int img_id = 0; img_id < 2; img_id++) {
     char fname[20];
     sprintf(fname, "img/%d", img_id);
-    write_graph(t[img_id], fname);
+
+    Image img = generate_image(pre, 2, post, 3);
+    write_image(fopen(fname, "w"), &img);
   }
 }
