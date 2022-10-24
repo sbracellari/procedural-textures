@@ -238,11 +238,15 @@ void generate_files(int do_io) {
   post[0] = &folding;
   post[1] = &matrix_transform_image;
   post[2] = &folding;
+
   for (int img_id = 0; img_id < 2; img_id++) {
     char fname[20];
     sprintf(fname, "img/%d", img_id);
 
     Image img = generate_image(pre, 2, post, 3);
-    write_image(fopen(fname, "w"), &img);
+
+    if (do_io) {
+      write_image(fopen(fname, "w"), &img);
+    }
   }
 }
