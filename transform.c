@@ -123,27 +123,30 @@ Points generate_points3(Image *img) {
 // points (NUM_POINTS) and calculate the distance to the closest one
 // this is pretty inefficient as it stands but that might lend itself
 // well to the parallelization that'll take place later on
-void distance(Image *img) {
+void distance(Image *restrict img) {
   // Todo less stupid way of using an image to fetch random points
   Points ps = generate_points3(img);
+  float(*data)[IMAGE_SIZE] = (img->data);
   float mindist = INFINITY;
-  for (int x = 0; x < IMAGE_SIZE; x++) {
-    for (int y = 0; y < IMAGE_SIZE; y++) {
-      mindist = INFINITY;
-      for (int i = 0; i < NUM_POINTS; i++) {
-        float x_dist = (ps.xcoords[i] - x) * (ps.xcoords[i] - x);
-        float y_dist = (ps.ycoords[i] - y) * (ps.ycoords[i] - y);
-        float distance = sqrt(x_dist + y_dist);
-        if (distance < mindist) {
-          mindist = distance;
+#pragma acc kernels
+  {
+    for (int x = 0; x < IMAGE_SIZE; x++) {
+      for (int y = 0; y < IMAGE_SIZE; y++) {
+        mindist = INFINITY;
+#pragma acc loop reduction(min : mindist)
+        for (int i = 0; i < NUM_POINTS; i++) {
+          float x_dist = (ps.xcoords[i] - x) * (ps.xcoords[i] - x);
+          float y_dist = (ps.ycoords[i] - y) * (ps.ycoords[i] - y);
+          float distance = sqrt(x_dist + y_dist);
+          mindist = fmin(distance, mindist);
         }
-      }
 
-      img->data[x][y] = mindist;
+        data[x][y] = mindist;
+      }
     }
+    free(ps.xcoords);
+    free(ps.ycoords);
   }
-  free(ps.xcoords);
-  free(ps.ycoords);
 }
 
 // The folding technique is used here

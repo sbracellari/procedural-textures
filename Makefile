@@ -1,7 +1,12 @@
 TARGET = cells
 LIBS = -lm
 CC = gcc
-CFLAGS = -g -Wall
+
+ifeq ($(CC), nvc)
+    CFLAGS = -acc=host -Minfo=accel
+else
+    CFLAGS = -g -Wall
+endif
 
 .PHONY: default all clean
 
