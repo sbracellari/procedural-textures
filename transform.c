@@ -206,8 +206,108 @@ void color_convert(Image *img) {
       } else if (img->data[x][y] > maxdist) {
         maxdist = img->data[x][y];
       }
-
+    }
+  }
+  for (int x = 0; x < IMAGE_SIZE; x++) {
+    for (int y = 0; y < IMAGE_SIZE; y++) {
       img->data[x][y] = (img->data[x][y] - mindist) / (maxdist - mindist);
+    }
+  }
+}
+
+int neighbor_fires(Image *img, int src_x, int src_y) {
+  int count = 0;
+  for (int dest_x = src_x - 1; dest_x <= src_x + 1; ++dest_x) {
+    for (int dest_y = src_y - 1; dest_y <= src_y + 1; ++dest_y) {
+      if (dest_y < 0) {
+        dest_y = IMAGE_SIZE - 1;
+      }
+      if (dest_x < 0) {
+        dest_x = IMAGE_SIZE - 1;
+      }
+      // if (dest_y < 0 || dest_y >= IMAGE_SIZE || dest_x < 0 ||
+      //     dest_x >= IMAGE_SIZE) {
+      //   continue;
+      // }
+      if (img->data[dest_x % IMAGE_SIZE][dest_y % IMAGE_SIZE] == 0.0) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+int neighbor_forests(Image *img, int src_x, int src_y) {
+  int count = 0;
+  for (int dest_x = src_x - 1; dest_x <= src_x + 1; ++dest_x) {
+    for (int dest_y = src_y - 1; dest_y <= src_y + 1; ++dest_y) {
+      if (dest_y < 0 || dest_y >= IMAGE_SIZE || dest_x < 0 ||
+          dest_x >= IMAGE_SIZE) {
+        continue;
+      }
+      if (img->data[dest_x][dest_y] == 1.0) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+void automata_step(Image *img) {
+  const float FIRE = 0.0;
+  const float FOREST = 1.0;
+  const float BARREN = 2.0;
+  Image prev = clone_image(img);
+  for (int i = 0; i < IMAGE_SIZE; ++i) {
+    for (int j = 0; j < IMAGE_SIZE; ++j) {
+      float val = prev.data[i][j];
+      if (val == FIRE) {
+        img->data[i][j] = BARREN;
+      } else if (val == FOREST) {
+        int neighbors = neighbor_fires(img, i, j);
+        if (neighbors > 0 || rand() % IMAGE_SIZE * 4 == 0) {
+          img->data[i][j] = FIRE;
+        }
+      } else {
+        if (rand() % 1000 == 0 && neighbor_forests(img, i, j) < 5) {
+          img->data[i][j] = FOREST;
+        }
+      }
+    }
+  }
+  free(prev.data);
+}
+
+float rand_float() {
+  float x = (float)rand() / ((float)RAND_MAX);
+  return x;
+}
+
+void celluar_automata(Image *img) {
+  color_convert(img);
+  const int NUM_STEPS = 32;
+  for (int i = 0; i < IMAGE_SIZE; ++i) {
+    for (int j = 0; j < IMAGE_SIZE; ++j) {
+      if (img->data[i][j] > rand_float()) {
+        img->data[i][j] = 1.0;
+      } else {
+        img->data[i][j] = 2.0;
+      }
+    }
+  }
+  for (int step = 0; step < NUM_STEPS; step++) {
+    automata_step(img);
+  }
+  for (int i = 0; i < IMAGE_SIZE; ++i) {
+    for (int j = 0; j < IMAGE_SIZE; ++j) {
+      if (img->data[i][j] == 0) {
+        img->data[i][j] = 2.0;
+      }
+      if (img->data[i][j] == 2.0) {
+        if (neighbor_forests(img, i, j) > 5) {
+          img->data[i][j] = 1.0;
+        }
+      }
     }
   }
 }
@@ -234,22 +334,59 @@ Image generate_image(Transform *pre, int pre_count, Transform *post,
 }
 
 void generate_files(int do_io) {
-  Transform pre[2];
+  Transform pre[1];
   pre[0] = &identity;
-  pre[1] = &identity;
+  Transform all_posts[4];
+  all_posts[0] = &identity;
+  all_posts[1] = &folding;
+  all_posts[2] = &celluar_automata;
+  all_posts[3] = &matrix_transform_image;
   Transform post[3];
   post[0] = &folding;
-  post[1] = &matrix_transform_image;
-  post[2] = &folding;
+  post[1] = &folding;
+  post[2] = &celluar_automata;
 
-  for (int img_id = 0; img_id < 2; img_id++) {
+  int img_id = 0;
+
+  int bit_string = 0;
+  int cellular_count = 0;
+  while (bit_string < (1 << 4)) {
+    for (int i = 0; i < 3; i++) {
+      post[i] = &identity;
+    }
+    cellular_count = 0;
+    int bs = bit_string;
+    printf("%d\n", bit_string);
+    int post_idx = 0;
+    while (bs != 0) {
+      int bottom = bs & 0x1;
+      switch (bottom) {
+      case 0:
+        post[post_idx++] = &folding;
+        break;
+      case 1:
+        post[post_idx++] = &celluar_automata;
+        cellular_count += 1;
+        break;
+      default:
+        post[post_idx++] = &identity;
+        break;
+      }
+      if (cellular_count > 1) {
+        goto END;
+      }
+      bs = bs >> 1;
+    }
     char fname[20];
     sprintf(fname, "img/%d", img_id);
 
-    Image img = generate_image(pre, 2, post, 3);
+    Image img = generate_image(pre, 1, post, 3);
 
     if (do_io) {
       write_image(fopen(fname, "w"), &img);
     }
+    img_id++;
+  END:
+    bit_string++;
   }
 }
