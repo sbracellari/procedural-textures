@@ -351,12 +351,15 @@ void generate_files(int do_io) {
   int bit_string = 0;
   int cellular_count = 0;
   while (bit_string < (1 << 4)) {
+    long start = clock();
     for (int i = 0; i < 3; i++) {
       post[i] = &identity;
     }
     cellular_count = 0;
     int bs = bit_string;
     printf("%d\n", bit_string);
+    if (bs == 0) {
+    }
     int post_idx = 0;
     while (bs != 0) {
       int bottom = bs & 0x1;
@@ -381,6 +384,9 @@ void generate_files(int do_io) {
     sprintf(fname, "img/%d", img_id);
 
     Image img = generate_image(pre, 1, post, 3);
+
+    double duration = (double)(clock() - start) / (CLOCKS_PER_SEC / 1000);
+    printf("Time Taken: %f ms\n", duration);
 
     if (do_io) {
       write_image(fopen(fname, "w"), &img);
