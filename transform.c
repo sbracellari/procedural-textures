@@ -237,6 +237,7 @@ int neighbor_fires(Image *img, int src_x, int src_y) {
   return count;
 }
 
+// #pragma acc routine seq
 int neighbor_forests(Image *img, int src_x, int src_y) {
   int count = 0;
   for (int dest_x = src_x - 1; dest_x <= src_x + 1; ++dest_x) {
@@ -253,29 +254,77 @@ int neighbor_forests(Image *img, int src_x, int src_y) {
   return count;
 }
 
-void automata_step(Image *img) {
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+void automata_step(Image *restrict img) {
   const float FIRE = 0.0;
   const float FOREST = 1.0;
   const float BARREN = 2.0;
-  Image prev = clone_image(img);
+  Image prev_img = clone_image(img);
+  float(*restrict prev)[IMAGE_SIZE] = (prev_img.data);
+  float(*restrict data)[IMAGE_SIZE] = img->data;
+  // Initialize the random data upfront
+  // This makes the openacc parallelization work better
+  int(*restrict rand_data)[IMAGE_SIZE] =
+      malloc(sizeof(int[IMAGE_SIZE][IMAGE_SIZE]));
   for (int i = 0; i < IMAGE_SIZE; ++i) {
     for (int j = 0; j < IMAGE_SIZE; ++j) {
-      float val = prev.data[i][j];
-      if (val == FIRE) {
-        img->data[i][j] = BARREN;
-      } else if (val == FOREST) {
-        int neighbors = neighbor_fires(img, i, j);
-        if (neighbors > 0 || rand() % IMAGE_SIZE * 4 == 0) {
-          img->data[i][j] = FIRE;
-        }
-      } else {
-        if (rand() % 1000 == 0 && neighbor_forests(img, i, j) < 5) {
-          img->data[i][j] = FOREST;
+      rand_data[i][j] = rand();
+    }
+  }
+#pragma acc kernels copyout(prev [0:IMAGE_SIZE] [0:IMAGE_SIZE],                \
+                            data [0:IMAGE_SIZE] [0:IMAGE_SIZE])
+  {
+    for (int i = 0; i < IMAGE_SIZE; ++i) {
+      for (int j = 0; j < IMAGE_SIZE; ++j) {
+        float val = prev[i][j];
+        if (val == FIRE) {
+          // Replace fire with barren land on the next tick
+          data[i][j] = BARREN;
+        } else if (val == FOREST) {
+          int neighbors = 0;
+          // Unrolled loop spreading fire from any of the 8 neighbors
+          // Accessing the wrong point is okay, but we cannot read out of bounds
+          if (prev[MAX(i - 1, 0)][MAX(j - 1, 0)] == 0) {
+            neighbors += 1;
+          }
+          if (prev[i][MAX(j - 1, 0)] == 0) {
+            neighbors += 1;
+          }
+          if (prev[MIN(i + 1, IMAGE_SIZE - 1)][MAX(j - 1, 0)] == 0) {
+            neighbors += 1;
+          }
+          if (prev[MAX(i - 1, 0)][j] == 0) {
+            neighbors += 1;
+          }
+          if (prev[MIN(i + 1, IMAGE_SIZE - 1)][j] == 0) {
+            neighbors += 1;
+          }
+          if (prev[MAX(i - 1, 0)][MIN(j + 1, IMAGE_SIZE - 1)] == 0) {
+            neighbors += 1;
+          }
+          if (prev[i][MIN(j + 1, IMAGE_SIZE - 1)] == 0) {
+            neighbors += 1;
+          }
+          if (prev[MIN(i + 1, IMAGE_SIZE - 1)][MIN(j + 1, IMAGE_SIZE - 1)] ==
+              0) {
+            neighbors += 1;
+          }
+          if (neighbors > 0 || rand_data[i][j] % IMAGE_SIZE * 4 == 0) {
+            data[i][j] = FIRE;
+          }
+        } else {
+          // With small probability regrow a forest
+          if (rand_data[i][j] % 1000 == 0) {
+            data[i][j] = FOREST;
+          }
         }
       }
     }
+    free(prev);
+    free(rand_data);
   }
-  free(prev.data);
 }
 
 float rand_float() {
@@ -336,11 +385,11 @@ Image generate_image(Transform *pre, int pre_count, Transform *post,
 void generate_files(int do_io) {
   Transform pre[1];
   pre[0] = &identity;
-  Transform all_posts[4];
-  all_posts[0] = &identity;
-  all_posts[1] = &folding;
-  all_posts[2] = &celluar_automata;
-  all_posts[3] = &matrix_transform_image;
+  // Transform all_posts[4];
+  // all_posts[0] = &identity;
+  // all_posts[1] = &folding;
+  // all_posts[2] = &celluar_automata;
+  // all_posts[3] = &matrix_transform_image;
   Transform post[3];
   post[0] = &folding;
   post[1] = &folding;

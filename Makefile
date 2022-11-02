@@ -3,28 +3,28 @@ LIBS = -lm
 CC = gcc
 
 ifeq ($(CC), nvc)
-    CFLAGS = -acc=host -Minfo=accel
+	CFLAGS = -acc=host -Minfo=accel -o $@
 else
-    CFLAGS = -g -Wall
+	CFLAGS = -g -Wall -o $@
 endif
 
-.PHONY: default all clean
+.PHONY: all clean
 
-default: $(TARGET)
-all: default
+all: $(TARGET) 
 
 OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 HEADERS = $(wildcard *.h)
 
 %.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $<
 
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
+	$(CC) $(OBJECTS) $(CFLAGS) $(LIBS) 
 
 clean:
 	-rm -f *.o
 	-rm -f $(TARGET)
 	-rm -f img/*
+	-touch img/dummy.txt
