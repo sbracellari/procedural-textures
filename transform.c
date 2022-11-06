@@ -5,9 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-// const int LUCAS1 = 11;
 const int LUCAS1 = 29;
-// const int LUCAS2 = 47;
 const int LUCAS2 = 199;
 
 typedef struct {
@@ -96,25 +94,7 @@ Points init_points() {
   return ps;
 }
 
-// generate some random data as a starting points
-Points generate_points() {
-  Points ps = init_points();
-  srand(time(NULL));
-  for (int i = 0; i < NUM_POINTS; i++) {
-    ps.xcoords[i] = rand() % IMAGE_SIZE;
-    ps.ycoords[i] = rand() % IMAGE_SIZE;
-  }
-  return ps;
-}
-
-Points generate_points2() {
-  Image img = rand_image();
-  Points top = top_points(&img);
-  free(img.data);
-  return top;
-}
-
-Points generate_points3(Image *img) {
+Points generate_points(Image *img) {
   Points top = all_top_points(img);
   return top;
 }
@@ -125,7 +105,7 @@ Points generate_points3(Image *img) {
 // well to the parallelization that'll take place later on
 void distance(Image *restrict img) {
   // Todo less stupid way of using an image to fetch random points
-  Points ps = generate_points3(img);
+  Points ps = generate_points(img);
   float(*data)[IMAGE_SIZE] = (img->data);
   float mindist = INFINITY;
 #pragma acc kernels
@@ -215,45 +195,6 @@ void color_convert(Image *img) {
   }
 }
 
-int neighbor_fires(Image *img, int src_x, int src_y) {
-  int count = 0;
-  for (int dest_x = src_x - 1; dest_x <= src_x + 1; ++dest_x) {
-    for (int dest_y = src_y - 1; dest_y <= src_y + 1; ++dest_y) {
-      if (dest_y < 0) {
-        dest_y = IMAGE_SIZE - 1;
-      }
-      if (dest_x < 0) {
-        dest_x = IMAGE_SIZE - 1;
-      }
-      // if (dest_y < 0 || dest_y >= IMAGE_SIZE || dest_x < 0 ||
-      //     dest_x >= IMAGE_SIZE) {
-      //   continue;
-      // }
-      if (img->data[dest_x % IMAGE_SIZE][dest_y % IMAGE_SIZE] == 0.0) {
-        count++;
-      }
-    }
-  }
-  return count;
-}
-
-// #pragma acc routine seq
-int neighbor_forests(Image *img, int src_x, int src_y) {
-  int count = 0;
-  for (int dest_x = src_x - 1; dest_x <= src_x + 1; ++dest_x) {
-    for (int dest_y = src_y - 1; dest_y <= src_y + 1; ++dest_y) {
-      if (dest_y < 0 || dest_y >= IMAGE_SIZE || dest_x < 0 ||
-          dest_x >= IMAGE_SIZE) {
-        continue;
-      }
-      if (img->data[dest_x][dest_y] == 1.0) {
-        count++;
-      }
-    }
-  }
-  return count;
-}
-
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -332,6 +273,22 @@ float rand_float() {
   return x;
 }
 
+int neighbor_forests(Image *img, int src_x, int src_y) {
+  int count = 0;
+  for (int dest_x = src_x - 1; dest_x <= src_x + 1; ++dest_x) {
+    for (int dest_y = src_y - 1; dest_y <= src_y + 1; ++dest_y) {
+      if (dest_y < 0 || dest_y >= IMAGE_SIZE || dest_x < 0 ||
+          dest_x >= IMAGE_SIZE) {
+        continue;
+      }
+      if (img->data[dest_x][dest_y] == 1.0) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
 void celluar_automata(Image *img) {
   color_convert(img);
   const int NUM_STEPS = 32;
@@ -365,7 +322,7 @@ void identity(Image *img) {}
 
 Image generate_image(Transform *pre, int pre_count, Transform *post,
                      int post_count) {
-  // Todo different random?
+
   Image img = rand_image();
   for (int i = 0; i < pre_count; ++i) {
     (*pre)(&img);
@@ -378,18 +335,14 @@ Image generate_image(Transform *pre, int pre_count, Transform *post,
   }
 
   color_convert(&img);
-  printf("Generated Image\n");
+  // printf("Generated Image\n");
   return img;
 }
 
 void generate_files(int do_io) {
   Transform pre[1];
   pre[0] = &identity;
-  // Transform all_posts[4];
-  // all_posts[0] = &identity;
-  // all_posts[1] = &folding;
-  // all_posts[2] = &celluar_automata;
-  // all_posts[3] = &matrix_transform_image;
+
   Transform post[3];
   post[0] = &folding;
   post[1] = &folding;
@@ -397,37 +350,33 @@ void generate_files(int do_io) {
 
   int img_id = 0;
 
-  int bit_string = 0;
-  int cellular_count = 0;
-  while (bit_string < (1 << 4)) {
+  int bit_strings[] = {0x0, 0x1, 0x111, 0x113, 0x2};
+  for (int i = 0; i < 5; i++) {
     long start = clock();
-    for (int i = 0; i < 3; i++) {
-      post[i] = &identity;
+    for (int j = 0; j < 3; j++) {
+      post[j] = &identity;
     }
-    cellular_count = 0;
-    int bs = bit_string;
-    printf("%d\n", bit_string);
-    if (bs == 0) {
-    }
+
+    int bs = bit_strings[i];
+
     int post_idx = 0;
-    while (bs != 0) {
-      int bottom = bs & 0x1;
+    while (bs != 0 && post_idx < 3) {
+      int bottom = bs & 0xF;
       switch (bottom) {
-      case 0:
+      case 1:
         post[post_idx++] = &folding;
         break;
-      case 1:
+      case 2:
         post[post_idx++] = &celluar_automata;
-        cellular_count += 1;
+        break;
+      case 3:
+        post[post_idx++] = &matrix_transform_image;
         break;
       default:
         post[post_idx++] = &identity;
         break;
       }
-      if (cellular_count > 1) {
-        goto END;
-      }
-      bs = bs >> 1;
+      bs = bs >> 4;
     }
     char fname[20];
     sprintf(fname, "img/%d", img_id);
@@ -435,13 +384,12 @@ void generate_files(int do_io) {
     Image img = generate_image(pre, 1, post, 3);
 
     double duration = (double)(clock() - start) / (CLOCKS_PER_SEC / 1000);
-    printf("Time Taken: %f ms\n", duration);
+    // printf("Time Taken: %f ms\n", duration);
+    printf("%f\n", duration);
 
     if (do_io) {
       write_image(fopen(fname, "w"), &img);
     }
     img_id++;
-  END:
-    bit_string++;
   }
 }
