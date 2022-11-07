@@ -45,18 +45,19 @@ Points top_points(Image *img) {
 
 Points all_top_points(Image *img) {
   Points ps = init_points();
-  Score scores[IMAGE_SIZE * IMAGE_SIZE];
+  Score *scores = malloc(sizeof(Score[IMAGE_SIZE * IMAGE_SIZE]));
   for (int i = 0; i < IMAGE_SIZE * IMAGE_SIZE; ++i) {
     int x = i % IMAGE_SIZE;
     int y = i / IMAGE_SIZE;
     Score score = {.x = x, .y = y, .value = img->data[y][x]};
     scores[i] = score;
   }
-  qsort(&scores, IMAGE_SIZE * IMAGE_SIZE, sizeof(Score), score_comp);
+  qsort(scores, IMAGE_SIZE * IMAGE_SIZE, sizeof(Score), score_comp);
   for (int i = 0; i < NUM_POINTS; ++i) {
     ps.xcoords[i] = scores[i].x;
     ps.ycoords[i] = scores[i].y;
   }
+  free(scores);
   return ps;
 }
 
@@ -134,27 +135,32 @@ void distance(Image *restrict img) {
 // There are two triple nested for loops that will
 // be parallelized later on for improved performance
 void folding(Image *img) {
-  float scale_A[IMAGE_SIZE][IMAGE_SIZE];
-  float fold_A[IMAGE_SIZE][IMAGE_SIZE];
 
-  float temp_A[IMAGE_SIZE][IMAGE_SIZE];
+  //  Score *scores = malloc(sizeof(Score[IMAGE_SIZE * IMAGE_SIZE]));
+  Image scale_A = new_image();
+  Image fold_A = new_image();
+  Image temp_A = clone_image(img);
+  // float *scale_A[IMAGE_SIZE] = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
+  // float *fold_A[IMAGE_SIZE] = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
 
-  // temp value for data so it doesnt overwrite, maybe add clone?
-  for (int x = 0; x < IMAGE_SIZE; x++) {
-    for (int y = 0; y < IMAGE_SIZE; y++) {
-      temp_A[x][y] = img->data[x][y];
-    }
-  }
+  // float *temp_A[IMAGE_SIZE] = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
+
+  // // temp value for data so it doesnt overwrite, maybe add clone?
+  // for (int x = 0; x < IMAGE_SIZE; x++) {
+  //   for (int y = 0; y < IMAGE_SIZE; y++) {
+  //     temp_A[x][y] = img->data[x][y];
+  //   }
+  // }
 
   for (int nfolds = 0; nfolds < 3; nfolds++) {
-    float min_A = temp_A[0][0];
-    float max_A = temp_A[0][0];
+    float min_A = temp_A.data[0][0];
+    float max_A = temp_A.data[0][0];
     for (int x = 0; x < IMAGE_SIZE; x++) {
       for (int y = 0; y < IMAGE_SIZE; y++) {
-        if (min_A > temp_A[x][y]) {
-          min_A = temp_A[x][y];
-        } else if (max_A < temp_A[x][y]) {
-          max_A = temp_A[x][y];
+        if (min_A > temp_A.data[x][y]) {
+          min_A = temp_A.data[x][y];
+        } else if (max_A < temp_A.data[x][y]) {
+          max_A = temp_A.data[x][y];
         }
       }
     }
@@ -163,14 +169,18 @@ void folding(Image *img) {
     for (int x = 0; x < IMAGE_SIZE; x++) {
       for (int y = 0; y < IMAGE_SIZE; y++) {
         if (nfolds == 0) {
-          img->data[x][y] = temp_A[x][y];
+          img->data[x][y] = temp_A.data[x][y];
         }
-        scale_A[x][y] = img->data[x][y] - min_A;
-        fold_A[x][y] = max_A / (nfolds + 1);
-        img->data[x][y] = fabs(scale_A[x][y] - fold_A[x][y]);
+        scale_A.data[x][y] = img->data[x][y] - min_A;
+        fold_A.data[x][y] = max_A / (nfolds + 1);
+        img->data[x][y] = fabs(scale_A.data[x][y] - fold_A.data[x][y]);
       }
     }
   }
+
+  free(scale_A.data);
+  free(fold_A.data);
+  free(temp_A.data);
 }
 
 // basically we just want to convert each value in distances
@@ -329,6 +339,7 @@ Image generate_image(Transform *pre, int pre_count, Transform *post,
     pre++;
   }
   distance(&img);
+
   for (int i = 0; i < post_count; ++i) {
     (*post)(&img);
     post++;
