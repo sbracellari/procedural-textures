@@ -2,3 +2,7 @@
 *.txt
 img/*
 !img/dummy.txt
+*.png
+.ipynb_checkpoints
+*.o
+.DS_Store
