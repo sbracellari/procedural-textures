@@ -10,7 +10,7 @@
 
 int main() {
   long start = clock();
-  int do_io = false;
+  int do_io = true;
   generate_files(do_io);
   double duration = (double)(clock() - start) / (CLOCKS_PER_SEC / 1000);
   printf("Total Time Taken: %f ms\n", duration);
