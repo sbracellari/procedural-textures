@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-// Initializes the an image using the Image structure
+// Initializes an image using the Image structure
 Image new_image() {
   Image img;
   img.data = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
@@ -16,7 +16,7 @@ Image new_image() {
   return img;
 }
 
-// Initializes and image and fills it with random values
+// Initializes an image and fills it with random values
 Image rand_image() {
   Image img = new_image();
   srand(time(NULL));
