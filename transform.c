@@ -1,3 +1,9 @@
+// The transform.c file houses all the primary 
+// functions that are used to generate and post
+// process textures procedurally. The four main 
+// functions include cellular texture, cellular
+// automata, folding, and matrix transforms. 
+
 #include "transform.h"
 #include "image.h"
 #include <math.h>
@@ -5,67 +11,27 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+// Define const, aliases, and structs
 const int LUCAS1 = 29;
 const int LUCAS2 = 199;
+
+typedef void (*Transform)(Image *);
 
 typedef struct {
   int x, y;
   float value;
 } Score;
 
-int score_comp(const void *elem1, const void *elem2) {
-  Score f = *((Score *)elem1);
-  Score s = *((Score *)elem2);
-  if (f.value > s.value)
-    return 1;
-  if (f.value < s.value)
-    return -1;
-  return 0;
-}
-
-Points top_points(Image *img) {
-  Points ps = init_points();
-  Score best_col[IMAGE_SIZE];
-  for (int i = 0; i < IMAGE_SIZE; ++i) {
-    Score best = {.x = i, .y = 0, .value = img->data[i][0]};
-    for (int j = 0; j < IMAGE_SIZE; ++j) {
-      if (best.value < img->data[i][j]) {
-        best = (Score){.x = i, .y = j, .value = img->data[i][j]};
-      }
-    }
-    best_col[i] = best;
-  }
-  qsort(&best_col, IMAGE_SIZE, sizeof(Score), score_comp);
-  for (int i = 0; i < NUM_POINTS; ++i) {
-    ps.xcoords[i] = best_col[i].x;
-    ps.ycoords[i] = best_col[i].y;
-  }
-  return ps;
-}
-
-Points all_top_points(Image *img) {
-  Points ps = init_points();
-  Score *scores = malloc(sizeof(Score[IMAGE_SIZE * IMAGE_SIZE]));
-  for (int i = 0; i < IMAGE_SIZE * IMAGE_SIZE; ++i) {
-    int x = i % IMAGE_SIZE;
-    int y = i / IMAGE_SIZE;
-    Score score = {.x = x, .y = y, .value = img->data[y][x]};
-    scores[i] = score;
-  }
-  qsort(scores, IMAGE_SIZE * IMAGE_SIZE, sizeof(Score), score_comp);
-  for (int i = 0; i < NUM_POINTS; ++i) {
-    ps.xcoords[i] = scores[i].x;
-    ps.ycoords[i] = scores[i].y;
-  }
-  free(scores);
-  return ps;
-}
-
-typedef void (*Transform)(Image *);
-
 typedef struct {
   int x, y;
 } Index2D;
+
+typedef struct {
+  int(*xcoords), (*ycoords);
+} Points;
 
 Index2D matrix_transform_sq(int x, int y, int dim) {
   Index2D out;
@@ -89,15 +55,38 @@ void matrix_transform_image(Image *img) {
   free(backup.data);
 }
 
+int score_comp(const void *elem1, const void *elem2) {
+  Score f = *((Score *)elem1);
+  Score s = *((Score *)elem2);
+  if (f.value > s.value)
+    return 1;
+  if (f.value < s.value)
+    return -1;
+  return 0;
+}
+
 Points init_points() {
   Points ps = {.xcoords = malloc(sizeof(float[NUM_POINTS])),
                .ycoords = malloc(sizeof(float[NUM_POINTS]))};
   return ps;
 }
 
-Points generate_points(Image *img) {
-  Points top = all_top_points(img);
-  return top;
+Points all_top_points(Image *img) {
+  Points ps = init_points();
+  Score *scores = malloc(sizeof(Score[IMAGE_SIZE * IMAGE_SIZE]));
+  for (int i = 0; i < IMAGE_SIZE * IMAGE_SIZE; ++i) {
+    int x = i % IMAGE_SIZE;
+    int y = i / IMAGE_SIZE;
+    Score score = {.x = x, .y = y, .value = img->data[y][x]};
+    scores[i] = score;
+  }
+  qsort(scores, IMAGE_SIZE * IMAGE_SIZE, sizeof(Score), score_comp);
+  for (int i = 0; i < NUM_POINTS; ++i) {
+    ps.xcoords[i] = scores[i].x;
+    ps.ycoords[i] = scores[i].y;
+  }
+  free(scores);
+  return ps;
 }
 
 // for any given point (x,y), look at a number of surrounding
@@ -105,8 +94,7 @@ Points generate_points(Image *img) {
 // this is pretty inefficient as it stands but that might lend itself
 // well to the parallelization that'll take place later on
 void distance(Image *restrict img) {
-  // Todo less stupid way of using an image to fetch random points
-  Points ps = generate_points(img);
+  Points ps = all_top_points(img);
   float(*data)[IMAGE_SIZE] = (img->data);
   float mindist = INFINITY;
 #pragma acc kernels
@@ -135,22 +123,9 @@ void distance(Image *restrict img) {
 // There are two triple nested for loops that will
 // be parallelized later on for improved performance
 void folding(Image *img) {
-
-  //  Score *scores = malloc(sizeof(Score[IMAGE_SIZE * IMAGE_SIZE]));
   Image scale_A = new_image();
   Image fold_A = new_image();
   Image temp_A = clone_image(img);
-  // float *scale_A[IMAGE_SIZE] = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
-  // float *fold_A[IMAGE_SIZE] = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
-
-  // float *temp_A[IMAGE_SIZE] = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
-
-  // // temp value for data so it doesnt overwrite, maybe add clone?
-  // for (int x = 0; x < IMAGE_SIZE; x++) {
-  //   for (int y = 0; y < IMAGE_SIZE; y++) {
-  //     temp_A[x][y] = img->data[x][y];
-  //   }
-  // }
 
   for (int nfolds = 0; nfolds < 3; nfolds++) {
     float min_A = temp_A.data[0][0];
@@ -204,9 +179,6 @@ void color_convert(Image *img) {
     }
   }
 }
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 void automata_step(Image *restrict img) {
   const float FIRE = 0.0;
@@ -302,6 +274,7 @@ int neighbor_forests(Image *img, int src_x, int src_y) {
 void celluar_automata(Image *img) {
   color_convert(img);
   const int NUM_STEPS = 32;
+  // Forest Growth
   for (int i = 0; i < IMAGE_SIZE; ++i) {
     for (int j = 0; j < IMAGE_SIZE; ++j) {
       if (img->data[i][j] > rand_float()) {
@@ -311,14 +284,17 @@ void celluar_automata(Image *img) {
       }
     }
   }
+  // Take the automata steps
   for (int step = 0; step < NUM_STEPS; step++) {
     automata_step(img);
   }
   for (int i = 0; i < IMAGE_SIZE; ++i) {
     for (int j = 0; j < IMAGE_SIZE; ++j) {
+      // If on fire, turn barren
       if (img->data[i][j] == 0) {
         img->data[i][j] = 2.0;
       }
+      // If more than 5 neighbor forsets, change to forest
       if (img->data[i][j] == 2.0) {
         if (neighbor_forests(img, i, j) > 5) {
           img->data[i][j] = 1.0;
@@ -328,8 +304,12 @@ void celluar_automata(Image *img) {
   }
 }
 
+// Allows us to skip transform steps in a way that doesn't
+// modify the texture
 void identity(Image *img) {}
 
+// Generate the texture with pre processing and
+// post processing transforms 
 Image generate_image(Transform *pre, int pre_count, Transform *post,
                      int post_count) {
 
@@ -346,10 +326,11 @@ Image generate_image(Transform *pre, int pre_count, Transform *post,
   }
 
   color_convert(&img);
-  // printf("Generated Image\n");
   return img;
 }
 
+// Generates textures and outputs a time on how long it takes
+// If do_io is true, the graphs.ipynb file can be used to view the images
 void generate_files(int do_io) {
   Transform pre[1];
   pre[0] = &identity;
@@ -395,7 +376,7 @@ void generate_files(int do_io) {
     Image img = generate_image(pre, 1, post, 3);
 
     double duration = (double)(clock() - start) / (CLOCKS_PER_SEC / 1000);
-    // printf("Time Taken: %f ms\n", duration);
+
     printf("%f\n", duration);
 
     if (do_io) {

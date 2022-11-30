@@ -1,3 +1,7 @@
+// The cells.c file is the main.c file for
+// this project. When compiled, this is the
+// file to run. 
+
 #include "image.h"
 #include "transform.h"
 #include <math.h>

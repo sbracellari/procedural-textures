@@ -1,6 +1,5 @@
-void generate_files(int do_io);
-typedef struct {
-  int(*xcoords), (*ycoords);
-} Points;
+// The purpose of the transform.h file is to allow
+// the generate_files function to be called in our
+// main program: cells.c. 
 
-Points init_points();
+void generate_files(int do_io);
