@@ -33,6 +33,7 @@ typedef struct {
   int(*xcoords), (*ycoords);
 } Points;
 
+// Helper function for matrix transform
 Index2D matrix_transform_sq(int x, int y, int dim) {
   Index2D out;
   out.x = (LUCAS1 * x) % dim;
@@ -55,6 +56,8 @@ void matrix_transform_image(Image *img) {
   free(backup.data);
 }
 
+// Next 3 functions are helper functions for distance formula
+// This is what is used to compare values in distance formula qsort
 int score_comp(const void *elem1, const void *elem2) {
   Score f = *((Score *)elem1);
   Score s = *((Score *)elem2);
@@ -65,22 +68,27 @@ int score_comp(const void *elem1, const void *elem2) {
   return 0;
 }
 
+// Allocates space for coordinates of focal points 
 Points init_points() {
   Points ps = {.xcoords = malloc(sizeof(float[NUM_POINTS])),
                .ycoords = malloc(sizeof(float[NUM_POINTS]))};
   return ps;
 }
 
+// Returns coordinates for number of points defined by NUM_POINTS
 Points all_top_points(Image *img) {
   Points ps = init_points();
   Score *scores = malloc(sizeof(Score[IMAGE_SIZE * IMAGE_SIZE]));
+  // Iterate through each data point and assign values to score
   for (int i = 0; i < IMAGE_SIZE * IMAGE_SIZE; ++i) {
     int x = i % IMAGE_SIZE;
     int y = i / IMAGE_SIZE;
     Score score = {.x = x, .y = y, .value = img->data[y][x]};
     scores[i] = score;
   }
+  // Sort scores using qsort
   qsort(scores, IMAGE_SIZE * IMAGE_SIZE, sizeof(Score), score_comp);
+  // Assign coordinates to top n points 
   for (int i = 0; i < NUM_POINTS; ++i) {
     ps.xcoords[i] = scores[i].x;
     ps.ycoords[i] = scores[i].y;
@@ -180,6 +188,8 @@ void color_convert(Image *img) {
   }
 }
 
+// For each step in automata, iterate through entire image 
+// and apply forest fire logic
 void automata_step(Image *restrict img) {
   const float FIRE = 0.0;
   const float FOREST = 1.0;
@@ -255,6 +265,7 @@ float rand_float() {
   return x;
 }
 
+// Counts how many neighbors are forests
 int neighbor_forests(Image *img, int src_x, int src_y) {
   int count = 0;
   for (int dest_x = src_x - 1; dest_x <= src_x + 1; ++dest_x) {
