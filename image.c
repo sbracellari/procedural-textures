@@ -1,8 +1,14 @@
+// The image.c file contains functions to initialize, fill, clone
+// write, load, and swap an image. This file relies on the Image struct 
+// defined in the image.h file. These functions are utilized in transform.c
+// when transforming created images. 
+
 #include "image.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
+// Initializes an image using the Image structure
 Image new_image() {
   Image img;
   img.data = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
@@ -10,6 +16,7 @@ Image new_image() {
   return img;
 }
 
+// Initializes an image and fills it with random values
 Image rand_image() {
   Image img = new_image();
   srand(time(NULL));
@@ -21,6 +28,8 @@ Image rand_image() {
   return img;
 }
 
+// Makes a copy of an image and can be used if you don't want
+// modifications to impact the original image
 Image clone_image(const Image *original) {
   Image out;
   out.data = malloc(sizeof(float[IMAGE_SIZE][IMAGE_SIZE]));
@@ -34,6 +43,8 @@ Image clone_image(const Image *original) {
   return out;
 }
 
+// Writes the image out to a file to be viewed via
+// the jupyter notebook
 void write_image(FILE *f, const Image *img) {
   for (int x = 0; x < IMAGE_SIZE; x++) {
     for (int y = 0; y < IMAGE_SIZE; y++) {
@@ -42,6 +53,7 @@ void write_image(FILE *f, const Image *img) {
   }
 }
 
+// Loads an image from a file
 Image load_image(FILE *f) {
   if (f == NULL) {
     exit(1);
@@ -59,6 +71,7 @@ Image load_image(FILE *f) {
   return img;
 }
 
+// Swaps data for img1 and img2
 void swap_image(Image *img1, Image *img2) {
   Image tmp = *img1;
   *img1 = *img2;

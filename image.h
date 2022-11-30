@@ -1,9 +1,14 @@
+// The image.h file defines the Image struct
+// while also giving other files access to 
+// Image creation/modificaton functions. 
+
 #include <stdio.h>
 
+// Image size in pixels
 #define IMAGE_SIZE 512
 #define NUM_POINTS 100
 
-// Image structure
+// Image structure definition
 typedef struct {
   float (*data)[IMAGE_SIZE];
 } Image;
